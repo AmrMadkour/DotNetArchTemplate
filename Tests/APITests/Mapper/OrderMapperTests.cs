@@ -1,5 +1,6 @@
 using API.Dtos;
 using API.Mapper;
+using Tests.Builders;
 
 namespace Tests.APITests.Mapper;
 
@@ -11,10 +12,7 @@ public class OrderMapperTests
         //Arrange
         var dto = new OrderDto
         {
-            Items = new List<ItemDto>
-            {
-                new() { ProductId = "P1", UnitPrice = 10, Quantity = 1 }
-            },
+            Items = new List<ItemDto> { new ItemDtoBuilder().Build() },
             CouponCode = "SAVE10"
         };
 
@@ -25,7 +23,7 @@ public class OrderMapperTests
         Assert.Single(order.Items!);
         Assert.Equal("P1", order.Items![0].ProductId);
         Assert.Equal(10, order.Items[0].UnitPrice);
-        Assert.Equal(1, order.Items[0].Quantity);
+        Assert.Equal(2, order.Items[0].Quantity);
         Assert.Equal("SAVE10", order.CouponCode);
     }
 

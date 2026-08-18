@@ -1,5 +1,5 @@
-using API.Dtos;
 using API.Mapper;
+using Tests.Builders;
 
 namespace Tests.APITests.Mapper;
 
@@ -9,7 +9,7 @@ public class ItemMapperTests
     public void WhenValidItemDto_ToDomain_ShouldMapAllFields()
     {
         //Arrange
-        var dto = new ItemDto { ProductId = "P1", UnitPrice = 10, Quantity = 2 };
+        var dto = new ItemDtoBuilder().Build();
 
         //Act
         var item = dto.ToDomain();
