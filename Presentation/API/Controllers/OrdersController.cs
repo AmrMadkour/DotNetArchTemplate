@@ -1,6 +1,7 @@
 using API.Dtos;
 using API.Mapper;
-using Application;
+using Application.Services;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
@@ -13,10 +14,12 @@ public class OrdersController(
     private readonly IQuoteService _quoteService = quoteService;
 
     [HttpPost(Name = "quote")]
-    public ActionResult<QuoteDto> Quote(OrderDto orderdto)
+    public async Task<ActionResult<OrderDto>> Quote(OrderDto orderdto)
     {
         var order = orderdto.ToDomain();
-        _quoteService.PrepareQuote(orderdto);
-        return Ok(new QuoteDto());
+        var result = await _quoteService.PrepareQuote(order); // Result<Quote, Error>
+        return result.IsSuccess
+            ? Ok(result.Value.ToDto())
+            : BadRequest(result.Error); // Error is a safe DTO (message/code), never the exception
     }
 }

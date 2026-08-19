@@ -1,5 +1,5 @@
-using Application;
 using Application.Exceptions;
+using Application.Services;
 using Domain.Models;
 using Tests.Builders;
 
