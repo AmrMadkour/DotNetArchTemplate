@@ -8,7 +8,7 @@ public class ResultTests
     public void WhenSuccess_Value_ShouldReturnValue()
     {
         //Arrange
-        var result = Result<int, string>.Success(42);
+        var result = Result<int>.Success(42);
 
         //Act
         var value = result.Value;
@@ -19,40 +19,53 @@ public class ResultTests
     }
 
     [Fact]
-    public void WhenSuccess_Error_ShouldThrow()
+    public void WhenSuccess_ErrorMessage_ShouldThrow()
     {
         //Arrange
-        var result = Result<int, string>.Success(42);
+        var result = Result<int>.Success(42);
 
         //Act
 
         //Assert
-        Assert.Throws<InvalidOperationException>(() => result.Error);
+        Assert.Throws<InvalidOperationException>(() => result.ErrorMessage);
     }
 
     [Fact]
-    public void WhenFailure_Error_ShouldReturnError()
+    public void WhenFailure_ErrorMessage_ShouldReturnErrorMessage()
     {
         //Arrange
-        var result = Result<int, string>.Failure("failed");
+        var result = Result<int>.Failure("failed");
 
         //Act
-        var error = result.Error;
+        var errorMessage = result.ErrorMessage;
 
         //Assert
         Assert.False(result.IsSuccess);
-        Assert.Equal("failed", error);
+        Assert.Equal("failed", errorMessage);
     }
 
     [Fact]
     public void WhenFailure_Value_ShouldThrow()
     {
         //Arrange
-        var result = Result<int, string>.Failure("failed");
+        var result = Result<int>.Failure("failed");
 
         //Act
 
         //Assert
         Assert.Throws<InvalidOperationException>(() => result.Value);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void WhenFailureAndNoErrorMessage_ErrorMessage_ShouldThrow(string? errorMessage)
+    {
+        //Arrange
+
+        //Act
+
+        //Assert
+        Assert.Throws<ArgumentException>(() => Result<int>.Failure(errorMessage!));
     }
 }

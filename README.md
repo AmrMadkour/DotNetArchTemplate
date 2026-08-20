@@ -12,8 +12,8 @@ Presentation/API, Presentation/MinimalAPI  →  Application  →  Domain
 Tests  →  Domain, Application, Infrastructure
 ```
 
-- **`Domain/`** — POCOs only (`Order`, `Item`, `Quote`). No dependencies on any other project or framework.
-- **`Application/`** — use-case orchestration, split by kind: `Services/` (`IQuoteService`/`QuoteService`), `Results/` (`Result<TValue, TError>`, `Error` — generic outcome wrapper for expected failures). References `Domain` only; framework-agnostic.
+- **`Domain/`** — `Order`, `Item`, `Quote`. No dependencies on any other project or framework. `Order`/`Item` now own their invariant checks (`string? Validate()`) and calculations (`CalculateSubtotal()`) as entity behavior, not plain property bags.
+- **`Application/`** — use-case orchestration, split by kind: `Services/` (`IQuoteService`/`QuoteService`), `Results/` (`Result<TValue>` — single-generic outcome wrapper with a `string ErrorMessage` for expected failures). References `Domain` only; framework-agnostic.
 - **`Infrastructure/`** — scaffolded, currently empty. Intended home for EF Core, repositories, and external clients.
 - **`Presentation/API/`** and **`Presentation/MinimalAPI/`** — two parallel presentation layers (controller-based vs. Minimal API) solving the same use case side by side, each with its own `Dtos/`. `API` also has a `Mapper/` folder (`OrderMapper`, `ItemMapper`, `QuoteMapper`) for DTO ↔ domain translation; `MinimalAPI` doesn't have one yet.
 - **`Tests/`** — one xUnit project, organized into per-layer folders, with fluent Test Data Builders under `Builders/`.
@@ -61,7 +61,8 @@ Portable conventions settled on in this repo — meant to carry over to other pr
 5. Each layer registers its own services via its own `DependencyInjection.cs` extension method.
 6. Use a Test Data Builder for a type once it's constructed in more than one test; a one-off object used in a single test stays inline.
 7. Presentation's public surface (controller signatures, DTOs) never exposes Domain types directly — project references don't stop this, so it's enforced by discipline/review (or an architecture test).
-8. Exceptions are only for the unexpected: expected failures (validation, business rules) return `Result<T, Error>`, not exceptions; try/catch is for translating exceptions thrown by code you don't control (DB/HTTP/3rd-party) at its boundary; a global handler catches whatever's left.
+8. Exceptions are only for the unexpected: expected failures (validation, business rules) return `Result<T>`, not exceptions; try/catch is for translating exceptions thrown by code you don't control (DB/HTTP/3rd-party) at its boundary; a global handler catches whatever's left.
+9. Entity invariant validation lives on the entity itself as `string? Validate()` (`null` = valid), composed from private per-rule checks — no `out` params, no separate validation service.
 
 ## Prerequisites
 
@@ -73,7 +74,7 @@ No database or external services are required — `Infrastructure` is currently 
 
 ```bash
 git clone <repo-url>
-cd DotNetArchTemplate
+cd dotNet-arch-template
 dotnet restore dotNet-arch-template.slnx
 ```
 
@@ -83,12 +84,12 @@ dotnet restore dotNet-arch-template.slnx
 dotnet build dotNet-arch-template.slnx
 ```
 
-> **Note:** this currently fails to build in `Presentation/API/Controllers/OrdersController.cs` (its action declares `ActionResult<OrderDto>` but maps the result to a `QuoteDto`) — a known, intentionally parked mid-refactor stub (see `CLAUDE.md`). `Domain`, `Application`, `Infrastructure`, and `Presentation/MinimalAPI` build clean on their own; build them individually with `dotnet build <ProjectPath>` if you want to skip `API`. **`Tests` also fails to build** for the same reason, since it references `Presentation/API` — see the Test section below.
+The whole solution builds clean, including `Presentation/API` and `Tests`.
 
 ### Run
 
 ```bash
-dotnet run --project Presentation/API/API.csproj          # currently fails to compile, see note above
+dotnet run --project Presentation/API/API.csproj
 dotnet run --project Presentation/MinimalAPI/MinimalAPI.csproj
 ```
 
@@ -99,8 +100,8 @@ dotnet test Tests/Tests.csproj
 dotnet test Tests/Tests.csproj --filter "FullyQualifiedName~QuoteServiceTests"   # run one test class
 ```
 
-> **Note:** `Tests` references `Presentation/API` (for `Tests/APITests/Mapper`), so it currently fails to build for the same reason as `API` — see the Build note above. Both commands will work again once `OrdersController` compiles; `QuoteServiceTests` will still need updating afterward, since it asserts the old throw-based behavior.
+> **Note:** 3 tests currently fail — `Tests/ApplicationTests/QuoteServiceTests.cs` is stale and still asserts the old throw-based behavior (`PrepareQuote` now returns a `Result` instead of throwing), and one `ResultTests` case expects `ArgumentException` but `Result<TValue>.Failure(null)` throws the more specific `ArgumentNullException`. Both are known, not yet fixed.
 
 ## Status
 
-`Application/QuoteService.PrepareQuote` is an intentional stub returning `Task<Result<Quote, Error>>`, being driven out via TDD, one rule at a time, starting from `Tests/ApplicationTests/QuoteServiceTests.cs` (currently stale — still asserts the old throw-based behavior). DTO ↔ domain mapping now exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it, but has a return-type bug (see Build note above); `Presentation/MinimalAPI` has no mapping yet.
+`Application/QuoteService.PrepareQuote` is implemented: it validates the order via `Order.Validate()`, computes `Subtotal` via `Order.CalculateSubtotal()`, applies `SAVE10`/`SAVE20` coupon rules with dollar thresholds, and computes `Total` — returning `Result<Quote>` throughout instead of throwing. `Tests/ApplicationTests/QuoteServiceTests.cs` hasn't been updated to match yet (see Test note above). DTO ↔ domain mapping exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it correctly; `Presentation/MinimalAPI` has no mapping yet.

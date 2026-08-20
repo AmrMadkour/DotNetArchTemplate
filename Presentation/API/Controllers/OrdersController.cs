@@ -14,12 +14,12 @@ public class OrdersController(
     private readonly IQuoteService _quoteService = quoteService;
 
     [HttpPost(Name = "quote")]
-    public async Task<ActionResult<OrderDto>> Quote(OrderDto orderdto)
+    public async Task<ActionResult<QuoteDto>> Quote(OrderDto orderdto)
     {
         var order = orderdto.ToDomain();
-        var result = await _quoteService.PrepareQuote(order); // Result<Quote, Error>
+        var result = await _quoteService.PrepareQuote(order);
         return result.IsSuccess
             ? Ok(result.Value.ToDto())
-            : BadRequest(result.Error); // Error is a safe DTO (message/code), never the exception
+            : BadRequest(result.ErrorMessage);
     }
 }

@@ -5,5 +5,5 @@ namespace Application.Services;
 
 public interface IQuoteService
 {
-   Task<Result<Quote, Error>> PrepareQuote(Order order);
+   Task<Result<Quote>> PrepareQuote(Order order);
 }
