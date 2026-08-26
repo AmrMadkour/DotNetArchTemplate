@@ -12,7 +12,7 @@ For any answer that would otherwise be long — explanations, concept teaching, 
 2. **But don't over-explain.** No padding, no restating the question, no "as you can see," no covering angles nobody asked about. Say what's needed and stop.
 3. **Split it into sections.** Short paragraphs, clear headers, one idea per chunk — never one dense unbroken block, even for a single conceptual answer.
 4. **Be human about it.** Write like you're talking to someone, not like documentation. Plain words over jargon-stacking.
-5. **For genuinely long, multi-part explanations** (teaching a concept, walking through a design with several distinct pieces), don't send it all in one message. Send **one section at a time**, then stop and wait for the user to say "go ahead"/"next"/ask a question before sending the next section. Don't assume permission to keep going.
+5. **Whenever the answer is split into sections at all**, don't send them all in one message — even if the whole thing wouldn't otherwise count as "genuinely long." Send **one section at a time**, then stop and wait for the user to say "go ahead"/"next"/ask a question before sending the next section. Don't assume permission to keep going.
 
 ## Why
 

@@ -61,8 +61,9 @@ Portable conventions settled on in this repo — meant to carry over to other pr
 5. Each layer registers its own services via its own `DependencyInjection.cs` extension method.
 6. Use a Test Data Builder for a type once it's constructed in more than one test; a one-off object used in a single test stays inline.
 7. Presentation's public surface (controller signatures, DTOs) never exposes Domain types directly — project references don't stop this, so it's enforced by discipline/review (or an architecture test).
-8. Exceptions are only for the unexpected: expected failures (validation, business rules) return `Result<T>`, not exceptions; try/catch is for translating exceptions thrown by code you don't control (DB/HTTP/3rd-party) at its boundary; a global handler catches whatever's left.
+8. Exceptions are only for the unexpected: expected failures (validation, business rules) return `Result<T>`, not exceptions; try/catch is for translating exceptions thrown by code you don't control (DB/HTTP/3rd-party) at its boundary; throw directly for invariant violations in your own code (e.g. a missing registration) — these are programmer errors, not caller-triggerable failures, so they don't get try/catch or `Result<T>` either; a global handler catches whatever's left.
 9. Entity invariant validation lives on the entity itself as `string? Validate()` (`null` = valid), composed from private per-rule checks — no `out` params, no separate validation service.
+10. Picking how to implement a variant/branching decision, ask: will the set of options grow (yes → dictionary/data lookup, not switch/if — OCP); does each option differ by algorithm or only by data (different algorithm → Strategy pattern, same algorithm/different data → plain lookup value); is the resolution reused across call sites or non-trivial to redo (yes → factory/resolver, single cheap call site → resolve inline via an injected collection). Then sanity-check the result against all five SOLID letters, not just OCP.
 
 ## Prerequisites
 
