@@ -1,29 +1,24 @@
 using API.Mapper;
 using Domain.Models;
+using FluentAssertions;
+using Tests.Builders;
 
 namespace Tests.APITests.Mapper;
 
 public class QuoteMapperTests
 {
     [Fact]
-    public void WhenValidQuote_ToDto_ShouldMapAllFields()
+    public void ToDto_WhenValidQuote_ShouldMapAllFields()
     {
         //Arrange
-        var quote = new Quote
-        {
-            Subtotal = 100,
-            DiscountAmount = 10,
-            Total = 90,
-            AppliedCoupon = "SAVE10"
-        };
+        var expectedQuoteDto = new QuoteDtoBuilder().Build();
 
         //Act
-        var dto = quote.ToDto();
+        var quoteDto = new QuoteBuilder().Build().ToDto();
 
         //Assert
-        Assert.Equal(100, dto.Subtotal);
-        Assert.Equal(10, dto.DiscountAmount);
-        Assert.Equal(90, dto.Total);
-        Assert.Equal("SAVE10", dto.AppliedCoupon);
+        Assert.Equivalent(expectedQuoteDto, quoteDto);
+
+        //quoteDto.Should().BeEquivalentTo(expectedQuoteDto);
     }
 }

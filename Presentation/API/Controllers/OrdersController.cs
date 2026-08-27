@@ -11,13 +11,11 @@ namespace API.Controllers;
 public class OrdersController(
     IQuoteService quoteService) : ControllerBase
 {
-    private readonly IQuoteService _quoteService = quoteService;
-
     [HttpPost(Name = "quote")]
-    public async Task<ActionResult<QuoteDto>> Quote(OrderDto orderdto)
+    public async Task<ActionResult<QuoteDto>> Quote(OrderDto orderDto)
     {
-        var order = orderdto.ToDomain();
-        var result = await _quoteService.PrepareQuote(order);
+        var order = orderDto.ToDomain();
+        var result = await quoteService.PrepareQuote(order);
         return result.IsSuccess
             ? Ok(result.Value.ToDto())
             : BadRequest(result.ErrorMessage);

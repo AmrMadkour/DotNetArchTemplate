@@ -64,6 +64,7 @@ Portable conventions settled on in this repo — meant to carry over to other pr
 8. Exceptions are only for the unexpected: expected failures (validation, business rules) return `Result<T>`, not exceptions; try/catch is for translating exceptions thrown by code you don't control (DB/HTTP/3rd-party) at its boundary; throw directly for invariant violations in your own code (e.g. a missing registration) — these are programmer errors, not caller-triggerable failures, so they don't get try/catch or `Result<T>` either; a global handler catches whatever's left.
 9. Entity invariant validation lives on the entity itself as `string? Validate()` (`null` = valid), composed from private per-rule checks — no `out` params, no separate validation service.
 10. Picking how to implement a variant/branching decision, ask: will the set of options grow (yes → dictionary/data lookup, not switch/if — OCP); does each option differ by algorithm or only by data (different algorithm → Strategy pattern, same algorithm/different data → plain lookup value); is the resolution reused across call sites or non-trivial to redo (yes → factory/resolver, single cheap call site → resolve inline via an injected collection). Then sanity-check the result against all five SOLID letters, not just OCP.
+11. Test method names follow `MethodUnderTest_Scenario_ExpectedBehavior` (e.g. `Quote_WhenPrepareQuoteSucceeds_ShouldReturnOk`) — method name first, not the condition.
 
 ## Prerequisites
 
@@ -101,8 +102,8 @@ dotnet test Tests/Tests.csproj
 dotnet test Tests/Tests.csproj --filter "FullyQualifiedName~QuoteServiceTests"   # run one test class
 ```
 
-> **Note:** 3 tests currently fail — `Tests/ApplicationTests/QuoteServiceTests.cs` is stale and still asserts the old throw-based behavior (`PrepareQuote` now returns a `Result` instead of throwing), and one `ResultTests` case expects `ArgumentException` but `Result<TValue>.Failure(null)` throws the more specific `ArgumentNullException`. Both are known, not yet fixed.
+> **Note:** 1 test currently fails — `Tests/ApplicationTests/Results/ResultTests.cs` expects `Result<TValue>.Failure(null)` to throw `ArgumentException`, but it throws the more specific `ArgumentNullException`. Known, not yet fixed.
 
 ## Status
 
-`Application/QuoteService.PrepareQuote` is implemented: it validates the order via `Order.Validate()`, computes `Subtotal` via `Order.CalculateSubtotal()`, applies `SAVE10`/`SAVE20` coupon rules with dollar thresholds, and computes `Total` — returning `Result<Quote>` throughout instead of throwing. `Tests/ApplicationTests/QuoteServiceTests.cs` hasn't been updated to match yet (see Test note above). DTO ↔ domain mapping exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it correctly; `Presentation/MinimalAPI` has no mapping yet.
+`Application/QuoteService.PrepareQuote` is implemented: it validates the order via `Order.Validate()`, computes `Subtotal` via `Order.CalculateSubtotal()`, applies `SAVE10`/`SAVE20` coupon rules with dollar thresholds, and computes `Total` — returning `Result<Quote>` throughout instead of throwing, fully covered by `Tests/ApplicationTests/Services/QuoteServiceTests.cs`. DTO ↔ domain mapping exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it correctly, covered by `Tests/APITests/Controllers/OrdersControllerTests.cs` (via `Moq`); `Presentation/MinimalAPI` has no mapping yet.

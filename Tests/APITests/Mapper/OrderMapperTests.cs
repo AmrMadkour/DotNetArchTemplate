@@ -1,5 +1,6 @@
 using API.Dtos;
 using API.Mapper;
+//using FluentAssertions;
 using Tests.Builders;
 
 namespace Tests.APITests.Mapper;
@@ -7,37 +8,31 @@ namespace Tests.APITests.Mapper;
 public class OrderMapperTests
 {
     [Fact]
-    public void WhenValidOrderDto_ToDomain_ShouldMapAllFields()
+    public void ToDomain_WhenValidOrderDto_ShouldMapAllFields()
     {
         //Arrange
-        var dto = new OrderDto
-        {
-            Items = new List<ItemDto> { new ItemDtoBuilder().Build() },
-            CouponCode = "SAVE10"
-        };
+        var expectedOrder = new OrderBuilder().Build();
 
         //Act
-        var order = dto.ToDomain();
+        var order = new OrderDtoBuilder().Build().ToDomain();
 
         //Assert
-        Assert.Single(order.Items!);
-        Assert.Equal("P1", order.Items![0].ProductId);
-        Assert.Equal(10, order.Items[0].UnitPrice);
-        Assert.Equal(2, order.Items[0].Quantity);
-        Assert.Equal("SAVE10", order.CouponCode);
+        Assert.Equivalent(expectedOrder, order);
+
+        //order.Should().BeEquivalentTo(expectedOrder);
     }
 
     [Fact]
-    public void WhenItemsIsNull_ToDomain_ShouldReturnNullItems()
+    public void ToDomain_WhenItemsIsNull_ShouldReturnNullItems()
     {
         //Arrange
-        var dto = new OrderDto { Items = null, CouponCode = null };
 
         //Act
-        var order = dto.ToDomain();
+        var order = new OrderDtoBuilder().WithItems(null).Build().ToDomain();
 
         //Assert
         Assert.Null(order.Items);
-        Assert.Null(order.CouponCode);
+
+        //order.Items.Should().BeNull();
     }
 }

@@ -6,7 +6,7 @@ public class ItemDtoBuilder
 {
     private string? _productId = "P1";
     private decimal _unitPrice = 10;
-    private int _quantity = 2;
+    private int _quantity = 1;
 
     public ItemDtoBuilder WithProductId(string? productId)
     {

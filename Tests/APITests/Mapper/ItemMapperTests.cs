@@ -1,4 +1,5 @@
 using API.Mapper;
+using FluentAssertions;
 using Tests.Builders;
 
 namespace Tests.APITests.Mapper;
@@ -6,17 +7,17 @@ namespace Tests.APITests.Mapper;
 public class ItemMapperTests
 {
     [Fact]
-    public void WhenValidItemDto_ToDomain_ShouldMapAllFields()
+    public void ToDomain_WhenValidItemDto_ShouldMapAllFields()
     {
         //Arrange
-        var dto = new ItemDtoBuilder().Build();
+        var expectedItem = new ItemBuilder().Build();
 
         //Act
-        var item = dto.ToDomain();
+        var item = new ItemDtoBuilder().Build().ToDomain();
 
         //Assert
-        Assert.Equal("P1", item.ProductId);
-        Assert.Equal(10, item.UnitPrice);
-        Assert.Equal(2, item.Quantity);
+        Assert.Equivalent(expectedItem, item);
+
+        //item.Should().BeEquivalentTo(sexpectedItem);
     }
 }

@@ -4,7 +4,7 @@ namespace Tests.Builders;
 
 public class OrderBuilder
 {
-    private List<Item>? _items = new() { new Item { ProductId = "P1", UnitPrice = 10, Quantity = 1 } };
+    private List<Item>? _items = [new ItemBuilder().Build()];
     private string? _couponCode = "SAVE10";
 
     public OrderBuilder WithItems(List<Item>? items)
