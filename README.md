@@ -102,8 +102,6 @@ dotnet test Tests/Tests.csproj
 dotnet test Tests/Tests.csproj --filter "FullyQualifiedName~QuoteServiceTests"   # run one test class
 ```
 
-> **Note:** 1 test currently fails — `Tests/ApplicationTests/Results/ResultTests.cs` expects `Result<TValue>.Failure(null)` to throw `ArgumentException`, but it throws the more specific `ArgumentNullException`. Known, not yet fixed.
-
 ## Status
 
 `Application/QuoteService.PrepareQuote` is implemented: it validates the order via `Order.Validate()`, computes `Subtotal` via `Order.CalculateSubtotal()`, applies `SAVE10`/`SAVE20` coupon rules with dollar thresholds, and computes `Total` — returning `Result<Quote>` throughout instead of throwing, fully covered by `Tests/ApplicationTests/Services/QuoteServiceTests.cs`. DTO ↔ domain mapping exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it correctly, covered by `Tests/APITests/Controllers/OrdersControllerTests.cs` (via `Moq`); `Presentation/MinimalAPI` has no mapping yet.

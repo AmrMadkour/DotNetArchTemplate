@@ -22,7 +22,11 @@ public sealed class Result<TValue>
         _errorMessage = errorMessage;
     }
 
-    public static Result<TValue> Success(TValue value) => new(true, value, default);
+    public static Result<TValue> Success(TValue value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return new(true, value, default);
+    }
 
     public static Result<TValue> Failure(string errorMessage)
     {
