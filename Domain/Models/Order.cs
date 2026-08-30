@@ -22,8 +22,6 @@ public class Order
     {
         return ValidateItems() ?? ValidateCouponCode();
     }
-
-
     private string? ValidateItems()
     {
         if (Items == null || Items.Count == 0)
