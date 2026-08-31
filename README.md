@@ -2,6 +2,29 @@
 
 A personal, standing reference solution for .NET architecture patterns — Clean Architecture, DDD, and TDD — built with **.NET 10**. It exists as a place to see how a given pattern was solved before, rather than a shippable product, so parts of it are deliberately left mid-refactor or unimplemented. See [`CLAUDE.md`](CLAUDE.md) for the full rationale and known rough edges.
 
+## What You Can Learn Here
+
+Quick access points — what to look at and where, updated as new patterns land.
+
+| What | Where |
+|---|---|
+| Clean Architecture (layers as separate projects, inward-only dependencies) | `Domain/`, `Application/`, `Infrastructure/`, `Presentation/API/`, `Presentation/MinimalAPI/` |
+| Entity invariants (`Validate()`) + computation (`CalculateSubtotal()`) on the entity | `Domain/Models/Order.cs`, `Domain/Models/Item.cs` |
+| Result pattern (no exceptions for expected failures) | `Application/Results/Result.cs` |
+| Use-case orchestration | `Application/Services/QuoteService.cs`, `Application/Services/IQuoteService.cs` |
+| Coupon lookup (data-driven, not switch) | `Domain/Models/Coupon.cs` / `CouponCatalog` |
+| Parked Strategy + Factory pattern (for when a coupon needs a different algorithm) | `Domain/Services/IDiscountStrategy.cs`, `PercentageDiscountStrategy.cs`, `FlatAmountDiscountStrategy.cs`, `DiscountStrategyFactory.cs` |
+| Manual DTO ↔ domain mapping (extension methods) | `Presentation/API/Mapper/`, `Presentation/MinimalAPI/Mapper/` |
+| DTOs (Presentation-only, never below) | `Presentation/API/Dtos/`, `Presentation/MinimalAPI/Dtos/` |
+| Controller-style endpoint | `Presentation/API/Controllers/OrdersController.cs` |
+| Minimal API endpoint | `Presentation/MinimalAPI/Endpoints/OrderEndpoints.cs` |
+| Per-layer DI registration | `Application/DependencyInjection.cs`, `Infrastructure/DependencyInjection.cs` |
+| API docs tooling compared side by side (native OpenAPI, Swagger UI, Scalar) | `Presentation/API/Program.cs`, `Presentation/MinimalAPI/Program.cs` |
+| Minimal API typed results (`Results<Ok<T>, BadRequest<string>>` via `TypedResults`, not a bare `IResult`) | `Presentation/MinimalAPI/Endpoints/OrderEndpoints.cs` |
+| Test Data Builders | `Tests/Builders/` |
+| Test naming convention (`Method_Scenario_Expected`) | `Tests/DomainTests/`, `Tests/ApplicationTests/`, `Tests/APITests/` |
+| Decision framework for switch vs. Strategy vs. factory | `CLAUDE.md` → Rule 10 |
+
 ## Architecture
 
 Clean Architecture with strictly inward-pointing dependencies, each layer its own project so the boundary is compiler-enforced:
@@ -94,6 +117,8 @@ The whole solution builds clean, including `Presentation/API` and `Tests`.
 dotnet run --project Presentation/API/API.csproj
 dotnet run --project Presentation/MinimalAPI/MinimalAPI.csproj
 ```
+
+In Development, both apps expose the same OpenAPI doc through three UIs side by side (for comparison, not a recommendation to use all three): `/swagger/index.html` (Swagger UI), `/scalar` (Scalar), and the raw `/openapi/v1.json` document.
 
 ### Test
 

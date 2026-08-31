@@ -1,5 +1,6 @@
 using Application;
 using Infrastructure;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddSwaggerGen();
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices();
@@ -17,7 +19,20 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    //Launch the app and navigate to https://localhost:{PORT}/openapi/v1.json
     app.MapOpenApi();
+    //Launch the app and navigate to https://localhost:{PORT}/swagger/v1/swagger.json
+    app.UseSwagger();
+    //Launch the app and navigate to https://localhost:{PORT}/swagger/index.html
+    app.UseSwaggerUI();
+    //Launch the app and navigate to https://localhost:{PORT}/index.html
+    //app.UseSwaggerUI(s =>
+    //{
+    //    s.SwaggerEndpoint("/swagger/v1/swagger.json", "swagger v1");
+    //    s.RoutePrefix = string.Empty;
+    //});
+    //Launch the app and navigate to https://localhost:{PORT}/scalar
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();
