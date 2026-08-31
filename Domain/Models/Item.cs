@@ -1,4 +1,6 @@
-﻿namespace Domain.Models;
+﻿using Domain.Constants;
+
+namespace Domain.Models;
 
 public class Item
 {
@@ -18,11 +20,11 @@ public class Item
 
     private string? ValidateQuantity()
     {
-        return Quantity <= 0 ? "Item quantity must be greater than 0." : null;
+        return Quantity <= 0 ? ValidationMessages.ItemQuantityMustBePositive : null;
     }
 
     private string? ValidateUnitPrice()
     {
-        return UnitPrice < 0 ? "Item unit price cannot be negative." : null;
+        return UnitPrice < 0 ? ValidationMessages.ItemUnitPriceCannotBeNegative : null;
     }
 }

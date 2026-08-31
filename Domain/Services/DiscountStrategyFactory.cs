@@ -1,4 +1,5 @@
-﻿using Domain.Models;
+﻿using Domain.Constants;
+using Domain.Models;
 
 namespace Domain.Services
 {
@@ -14,7 +15,7 @@ namespace Domain.Services
         {
             if (!_strategies.TryGetValue(discountType, out var strategy))
             {
-                throw new InvalidOperationException($"No IDiscountStrategy registered for {discountType}.");
+                throw new InvalidOperationException(string.Format(ValidationMessages.NoDiscountStrategyRegisteredFor, discountType));
             }
 
             return strategy;

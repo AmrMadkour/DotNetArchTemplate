@@ -1,3 +1,5 @@
+using Application.Constants;
+
 namespace Application.Results;
 
 public sealed class Result<TValue>
@@ -9,11 +11,11 @@ public sealed class Result<TValue>
 
     public TValue Value => IsSuccess
         ? _value!
-        : throw new InvalidOperationException("Cannot access Value on a failed Result.");
+        : throw new InvalidOperationException(ValidationMessages.CannotAccessValueOnFailedResult);
 
     public string ErrorMessage => !IsSuccess
         ? _errorMessage!
-        : throw new InvalidOperationException("Cannot access ErrorMessage on a successful Result.");
+        : throw new InvalidOperationException(ValidationMessages.CannotAccessErrorMessageOnSuccessfulResult);
 
     private Result(bool isSuccess, TValue? value, string? errorMessage)
     {

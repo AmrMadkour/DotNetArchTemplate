@@ -24,6 +24,7 @@ Quick access points — what to look at and where, updated as new patterns land.
 | Test Data Builders | `Tests/Builders/` |
 | Test naming convention (`Method_Scenario_Expected`) | `Tests/DomainTests/`, `Tests/ApplicationTests/`, `Tests/APITests/` |
 | Decision framework for switch vs. Strategy vs. factory | `CLAUDE.md` → Rule 10 |
+| Centralized message strings, one class per layer (not a shared project) | `Domain/Constants/ValidationMessages.cs`, `Application/Constants/ValidationMessages.cs` |
 
 ## Architecture
 
@@ -35,8 +36,8 @@ Presentation/API, Presentation/MinimalAPI  →  Application  →  Domain
 Tests  →  Domain, Application, Infrastructure
 ```
 
-- **`Domain/`** — `Order`, `Item`, `Quote`. No dependencies on any other project or framework. `Order`/`Item` now own their invariant checks (`string? Validate()`) and calculations (`CalculateSubtotal()`) as entity behavior, not plain property bags.
-- **`Application/`** — use-case orchestration, split by kind: `Services/` (`IQuoteService`/`QuoteService`), `Results/` (`Result<TValue>` — single-generic outcome wrapper with a `string ErrorMessage` for expected failures). References `Domain` only; framework-agnostic.
+- **`Domain/`** — `Order`, `Item`, `Quote`. No dependencies on any other project or framework. `Order`/`Item` now own their invariant checks (`string? Validate()`) and calculations (`CalculateSubtotal()`) as entity behavior, not plain property bags. `Constants/ValidationMessages` centralizes its error message strings.
+- **`Application/`** — use-case orchestration, split by kind: `Services/` (`IQuoteService`/`QuoteService`), `Results/` (`Result<TValue>` — single-generic outcome wrapper with a `string ErrorMessage` for expected failures), `Constants/ValidationMessages` (its own centralized message strings). References `Domain` only; framework-agnostic.
 - **`Infrastructure/`** — scaffolded, currently empty. Intended home for EF Core, repositories, and external clients.
 - **`Presentation/API/`** and **`Presentation/MinimalAPI/`** — two parallel presentation layers (controller-based vs. Minimal API) solving the same use case side by side, each with its own `Dtos/` and `Mapper/` (`OrderMapper`, `ItemMapper`, `QuoteMapper`) for DTO ↔ domain translation. `API` exposes it via `OrdersController`; `MinimalAPI` exposes it via `Endpoints/OrderEndpoints.cs` (`POST /orders/quote`).
 - **`Tests/`** — one xUnit project, organized into per-layer folders, with fluent Test Data Builders under `Builders/`.
@@ -88,6 +89,8 @@ Portable conventions settled on in this repo — meant to carry over to other pr
 9. Entity invariant validation lives on the entity itself as `string? Validate()` (`null` = valid), composed from private per-rule checks — no `out` params, no separate validation service.
 10. Picking how to implement a variant/branching decision, ask: will the set of options grow (yes → dictionary/data lookup, not switch/if — OCP); does each option differ by algorithm or only by data (different algorithm → Strategy pattern, same algorithm/different data → plain lookup value); is the resolution reused across call sites or non-trivial to redo (yes → factory/resolver, single cheap call site → resolve inline via an injected collection). Then sanity-check the result against all five SOLID letters, not just OCP.
 11. Test method names follow `MethodUnderTest_Scenario_ExpectedBehavior` (e.g. `Quote_WhenPrepareQuoteSucceeds_ShouldReturnOk`) — method name first, not the condition.
+12. Message/exception strings are centralized per layer into a `Constants/ValidationMessages` static class (e.g. `Domain.Constants.ValidationMessages`, `Application.Constants.ValidationMessages`) — not a single shared project — so each layer stays self-contained (Domain keeps zero dependencies).
+13. Tests assert against inline string literals, never against the same centralized message constant the production code reads from — asserting against the same constant makes the test tautological, since a changed message would still pass.
 
 ## Prerequisites
 

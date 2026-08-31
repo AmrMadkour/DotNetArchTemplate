@@ -1,4 +1,6 @@
-﻿namespace Domain.Models;
+﻿using Domain.Constants;
+
+namespace Domain.Models;
 
 public class Order
 {
@@ -26,7 +28,7 @@ public class Order
     {
         if (Items == null || Items.Count == 0)
         {
-            return "Order must contain at least one item.";
+            return ValidationMessages.OrderMustHaveAtLeastOneItem;
         }
         return Items.Select(item => item.Validate())
             .FirstOrDefault(error => error != null);
@@ -38,7 +40,7 @@ public class Order
             return null;
         }
 
-        return TryResolveCoupon(out _) ? null : "Invalid coupon code.";
+        return TryResolveCoupon(out _) ? null : ValidationMessages.InvalidCouponCode;
     }
     private bool TryResolveCoupon(out Coupon? coupon)
     {

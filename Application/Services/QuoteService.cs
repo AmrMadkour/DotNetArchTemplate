@@ -1,3 +1,4 @@
+using Application.Constants;
 using Application.Results;
 using Domain.Models;
 using Domain.Services;
@@ -38,7 +39,7 @@ public class QuoteService /*(DiscountStrategyFactory discountStrategyFactory)*/ 
     {
         if (order == null)
         {
-            return "Order can not be null.";
+            return ValidationMessages.OrderCannotBeNull;
         }
         var error = order.Validate();
         if (error != null)
