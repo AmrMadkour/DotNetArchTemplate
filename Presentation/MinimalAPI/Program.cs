@@ -1,6 +1,8 @@
 using Application;
 using Infrastructure;
+using Microsoft.AspNetCore.Diagnostics;
 using MinimalAPI.Endpoints;
+using MinimalAPI.Middleware;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,7 +17,21 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices();
 
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+    };
+});
+
 var app = builder.Build();
+
+app.UseExceptionHandler(new ExceptionHandlerOptions
+{
+    SuppressDiagnosticsCallback = _ => true
+});
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

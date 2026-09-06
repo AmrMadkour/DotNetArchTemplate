@@ -25,6 +25,7 @@ Quick access points — what to look at and where, updated as new patterns land.
 | Test naming convention (`Method_Scenario_Expected`) | `Tests/DomainTests/`, `Tests/ApplicationTests/`, `Tests/APITests/` |
 | Decision framework for switch vs. Strategy vs. factory | `CLAUDE.md` → Rule 10 |
 | Centralized message strings, one class per layer (not a shared project) | `Domain/Constants/ValidationMessages.cs`, `Application/Constants/ValidationMessages.cs` |
+| Global exception handler (RFC 7807 `ProblemDetails`, catch-all for unexpected errors) | `Presentation/API/Middleware/GlobalExceptionHandler.cs`, `Presentation/MinimalAPI/Middleware/GlobalExceptionHandler.cs` |
 
 ## Architecture
 
@@ -39,7 +40,7 @@ Tests  →  Domain, Application, Infrastructure
 - **`Domain/`** — `Order`, `Item`, `Quote`. No dependencies on any other project or framework. `Order`/`Item` now own their invariant checks (`string? Validate()`) and calculations (`CalculateSubtotal()`) as entity behavior, not plain property bags. `Constants/ValidationMessages` centralizes its error message strings.
 - **`Application/`** — use-case orchestration, split by kind: `Services/` (`IQuoteService`/`QuoteService`), `Results/` (`Result<TValue>` — single-generic outcome wrapper with a `string ErrorMessage` for expected failures), `Constants/ValidationMessages` (its own centralized message strings). References `Domain` only; framework-agnostic.
 - **`Infrastructure/`** — scaffolded, currently empty. Intended home for EF Core, repositories, and external clients.
-- **`Presentation/API/`** and **`Presentation/MinimalAPI/`** — two parallel presentation layers (controller-based vs. Minimal API) solving the same use case side by side, each with its own `Dtos/` and `Mapper/` (`OrderMapper`, `ItemMapper`, `QuoteMapper`) for DTO ↔ domain translation. `API` exposes it via `OrdersController`; `MinimalAPI` exposes it via `Endpoints/OrderEndpoints.cs` (`POST /orders/quote`).
+- **`Presentation/API/`** and **`Presentation/MinimalAPI/`** — two parallel presentation layers (controller-based vs. Minimal API) solving the same use case side by side, each with its own `Dtos/` and `Mapper/` (`OrderMapper`, `ItemMapper`, `QuoteMapper`) for DTO ↔ domain translation. `API` exposes it via `OrdersController`; `MinimalAPI` exposes it via `Endpoints/OrderEndpoints.cs` (`POST /orders/quote`). Each also has its own `Middleware/GlobalExceptionHandler.cs` — a global handler (per Rule 8) that logs unexpected exceptions and returns a generic RFC 7807 `ProblemDetails` response.
 - **`Tests/`** — one xUnit project, organized into per-layer folders, with fluent Test Data Builders under `Builders/`.
 
 ## Clean Architecture — what lives where
@@ -132,4 +133,4 @@ dotnet test Tests/Tests.csproj --filter "FullyQualifiedName~QuoteServiceTests"  
 
 ## Status
 
-`Application/QuoteService.PrepareQuote` is implemented: it validates the order via `Order.Validate()`, computes `Subtotal` via `Order.CalculateSubtotal()`, applies `SAVE10`/`SAVE20` coupon rules with dollar thresholds, and computes `Total` — returning `Result<Quote>` throughout instead of throwing, fully covered by `Tests/ApplicationTests/Services/QuoteServiceTests.cs`. DTO ↔ domain mapping exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it correctly, covered by `Tests/APITests/Controllers/OrdersControllerTests.cs` (via `Moq`). `Presentation/MinimalAPI` now has its own `Mapper/` and a `POST /orders/quote` endpoint (`Endpoints/OrderEndpoints.cs`), not yet covered by tests.
+`Application/QuoteService.PrepareQuote` is implemented: it validates the order via `Order.Validate()`, computes `Subtotal` via `Order.CalculateSubtotal()`, applies `SAVE10`/`SAVE20` coupon rules with dollar thresholds, and computes `Total` — returning `Result<Quote>` throughout instead of throwing, fully covered by `Tests/ApplicationTests/Services/QuoteServiceTests.cs`. DTO ↔ domain mapping exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it correctly, covered by `Tests/APITests/Controllers/OrdersControllerTests.cs` (via `Moq`). `Presentation/MinimalAPI` now has its own `Mapper/` and a `POST /orders/quote` endpoint (`Endpoints/OrderEndpoints.cs`), not yet covered by tests. Both presentation projects now have a `GlobalExceptionHandler` wired into `Program.cs`, each fully covered by its own `GlobalExceptionHandlerTests`.

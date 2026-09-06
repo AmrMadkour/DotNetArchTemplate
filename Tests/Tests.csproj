@@ -21,6 +21,7 @@
     <ProjectReference Include="..\Application\Application.csproj" />
     <ProjectReference Include="..\Infrastructure\Infrastructure.csproj" />
     <ProjectReference Include="..\Presentation\API\API.csproj" />
+    <ProjectReference Include="..\Presentation\MinimalAPI\MinimalAPI.csproj" />
   </ItemGroup>
 
   <ItemGroup>
