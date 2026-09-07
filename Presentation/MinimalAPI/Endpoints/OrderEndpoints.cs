@@ -18,6 +18,8 @@ public static class OrderEndpoints
             return result.IsSuccess
                 ? TypedResults.Ok(result.Value.ToDto())
                 : TypedResults.BadRequest(result.ErrorMessage);
-        });
+        })
+        .RequireAuthorization()
+        .RequireRateLimiting("PerUser");
     }
 }

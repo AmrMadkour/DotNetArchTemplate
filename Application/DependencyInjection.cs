@@ -9,6 +9,7 @@ public static class DependencyInjection
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IQuoteService, QuoteService>();
+        services.AddScoped<ILogTestService, LogTestService>();
 
         // Parked Strategy/Factory scaffold (see Domain/Services/IDiscountStrategy) —
         // registered so it's resolvable, but nothing calls it yet. See the comment

@@ -1,8 +1,10 @@
 using API.Dtos;
 using API.Mapper;
 using Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace API.Controllers;
 
@@ -11,6 +13,8 @@ namespace API.Controllers;
 public class OrdersController(
     IQuoteService quoteService) : ControllerBase
 {
+    [Authorize]
+    [EnableRateLimiting("PerUser")]
     [HttpPost(Name = "quote")]
     public async Task<ActionResult<QuoteDto>> Quote(OrderDto orderDto)
     {

@@ -26,6 +26,10 @@ Quick access points — what to look at and where, updated as new patterns land.
 | Decision framework for switch vs. Strategy vs. factory | `CLAUDE.md` → Rule 10 |
 | Centralized message strings, one class per layer (not a shared project) | `Domain/Constants/ValidationMessages.cs`, `Application/Constants/ValidationMessages.cs` |
 | Global exception handler (RFC 7807 `ProblemDetails`, catch-all for unexpected errors) | `Presentation/API/Middleware/GlobalExceptionHandler.cs`, `Presentation/MinimalAPI/Middleware/GlobalExceptionHandler.cs` |
+| Trace ID vs. correlation ID, propagated via `ILogger.BeginScope` (two structured-logging libraries compared side by side) | `Presentation/API/Middleware/RequestLoggingMiddleware.cs` (Serilog), `Presentation/MinimalAPI/Middleware/RequestLoggingMiddleware.cs` (NLog) |
+| JWT bearer authentication (`/auth/token`, `[Authorize]`/`.RequireAuthorization()`) | `Presentation/API/Auth/`, `Presentation/API/Controllers/AuthController.cs`, `Presentation/MinimalAPI/Endpoints/AuthEndpoints.cs` |
+| Fixed-window rate limiting, keyed by user vs. IP (partition-key logic pulled out for testability) | `Presentation/API/RateLimiting/RateLimitPartitionKeyResolver.cs`, `Presentation/MinimalAPI/RateLimiting/RateLimitPartitionKeyResolver.cs` |
+| A real frontend consumer (login → JWT → protected call, client-side token expiry) | `Presentation/WebApp/src/App.jsx` |
 
 ## Architecture
 
@@ -40,7 +44,8 @@ Tests  →  Domain, Application, Infrastructure
 - **`Domain/`** — `Order`, `Item`, `Quote`. No dependencies on any other project or framework. `Order`/`Item` now own their invariant checks (`string? Validate()`) and calculations (`CalculateSubtotal()`) as entity behavior, not plain property bags. `Constants/ValidationMessages` centralizes its error message strings.
 - **`Application/`** — use-case orchestration, split by kind: `Services/` (`IQuoteService`/`QuoteService`), `Results/` (`Result<TValue>` — single-generic outcome wrapper with a `string ErrorMessage` for expected failures), `Constants/ValidationMessages` (its own centralized message strings). References `Domain` only; framework-agnostic.
 - **`Infrastructure/`** — scaffolded, currently empty. Intended home for EF Core, repositories, and external clients.
-- **`Presentation/API/`** and **`Presentation/MinimalAPI/`** — two parallel presentation layers (controller-based vs. Minimal API) solving the same use case side by side, each with its own `Dtos/` and `Mapper/` (`OrderMapper`, `ItemMapper`, `QuoteMapper`) for DTO ↔ domain translation. `API` exposes it via `OrdersController`; `MinimalAPI` exposes it via `Endpoints/OrderEndpoints.cs` (`POST /orders/quote`). Each also has its own `Middleware/GlobalExceptionHandler.cs` — a global handler (per Rule 8) that logs unexpected exceptions and returns a generic RFC 7807 `ProblemDetails` response.
+- **`Presentation/API/`** and **`Presentation/MinimalAPI/`** — two parallel presentation layers (controller-based vs. Minimal API) solving the same use case side by side, each with its own `Dtos/` and `Mapper/` (`OrderMapper`, `ItemMapper`, `QuoteMapper`) for DTO ↔ domain translation. `API` exposes it via `OrdersController`; `MinimalAPI` exposes it via `Endpoints/OrderEndpoints.cs` (`POST /orders/quote`). Each also has its own `Middleware/GlobalExceptionHandler.cs` — a global handler (per Rule 8) that logs unexpected exceptions and returns a generic RFC 7807 `ProblemDetails` response. Both now also have: request logging with a trace ID + correlation ID (Serilog in `API`, NLog in `MinimalAPI`); JWT bearer auth (`/auth/token`, fixed demo credentials, protects the quote endpoint); and fixed-window rate limiting (3 requests/30s, by user on protected endpoints, by IP on the token endpoint). `API` also allows CORS from the React dev server.
+- **`Presentation/WebApp/`** — a plain React + Vite client (not part of the .NET solution) with one form: log in (JWT), then request a quote. Manually verified in a browser, no automated tests.
 - **`Tests/`** — one xUnit project, organized into per-layer folders, with fluent Test Data Builders under `Builders/`.
 
 ## Clean Architecture — what lives where
@@ -92,12 +97,14 @@ Portable conventions settled on in this repo — meant to carry over to other pr
 11. Test method names follow `MethodUnderTest_Scenario_ExpectedBehavior` (e.g. `Quote_WhenPrepareQuoteSucceeds_ShouldReturnOk`) — method name first, not the condition.
 12. Message/exception strings are centralized per layer into a `Constants/ValidationMessages` static class (e.g. `Domain.Constants.ValidationMessages`, `Application.Constants.ValidationMessages`) — not a single shared project — so each layer stays self-contained (Domain keeps zero dependencies).
 13. Tests assert against inline string literals, never against the same centralized message constant the production code reads from — asserting against the same constant makes the test tautological, since a changed message would still pass.
+14. Cross-cutting request-scoped context (trace ID, correlation ID) is threaded through `ILogger.BeginScope` at the Presentation-layer middleware, not passed as method parameters — it then shows up automatically in any layer's own injected `ILogger<T>` calls without changing that layer's method signatures.
 
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [Node.js](https://nodejs.org/) — only needed for `Presentation/WebApp` (the React client)
 
-No database or external services are required — `Infrastructure` is currently an empty scaffold, and no environment variables need to be configured.
+No database is required — `Infrastructure` is currently an empty scaffold. JWT/rate-limiting config lives in `appsettings.json` with demo defaults, so no environment variables need to be configured to run this locally.
 
 ## Getting started
 
@@ -124,6 +131,14 @@ dotnet run --project Presentation/MinimalAPI/MinimalAPI.csproj
 
 In Development, both apps expose the same OpenAPI doc through three UIs side by side (for comparison, not a recommendation to use all three): `/swagger/index.html` (Swagger UI), `/scalar` (Scalar), and the raw `/openapi/v1.json` document.
 
+Both require a JWT for the quote endpoint: `POST /auth/token` (`{"username":"demo","password":"demo123"}` by default, see `appsettings.json`) returns a token to send as `Authorization: Bearer <token>`.
+
+```bash
+cd Presentation/WebApp
+npm install
+npm run dev   # http://localhost:5173 — requires Presentation/API running on http://localhost:5023
+```
+
 ### Test
 
 ```bash
@@ -134,3 +149,5 @@ dotnet test Tests/Tests.csproj --filter "FullyQualifiedName~QuoteServiceTests"  
 ## Status
 
 `Application/QuoteService.PrepareQuote` is implemented: it validates the order via `Order.Validate()`, computes `Subtotal` via `Order.CalculateSubtotal()`, applies `SAVE10`/`SAVE20` coupon rules with dollar thresholds, and computes `Total` — returning `Result<Quote>` throughout instead of throwing, fully covered by `Tests/ApplicationTests/Services/QuoteServiceTests.cs`. DTO ↔ domain mapping exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it correctly, covered by `Tests/APITests/Controllers/OrdersControllerTests.cs` (via `Moq`). `Presentation/MinimalAPI` now has its own `Mapper/` and a `POST /orders/quote` endpoint (`Endpoints/OrderEndpoints.cs`), not yet covered by tests. Both presentation projects now have a `GlobalExceptionHandler` wired into `Program.cs`, each fully covered by its own `GlobalExceptionHandlerTests`.
+
+Both presentation projects also now have: request logging with a trace ID + correlation ID (`RequestLoggingMiddleware`, unit tested; the `ILogTestService`/`Diagnostics` endpoint that exercises it is a manual-verification tool, not unit tested); JWT bearer auth (`JwtTokenGenerator` + `AuthController`/`AuthEndpoints`, unit tested; fixed demo credentials, no real user store); and fixed-window rate limiting (`RateLimitPartitionKeyResolver`, unit tested; the actual throttling behavior itself is framework code and isn't). `Presentation/WebApp` is a new React client with a login-then-quote flow against `API`, verified manually in a browser — no automated tests.

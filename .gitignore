@@ -18,6 +18,13 @@ TestResults/
 *.coverage
 *.coveragexml
 
+## Logging output (Serilog/NLog write here at runtime)
+logs/
+
+## Node (Presentation/WebApp)
+node_modules/
+dist/
+
 ## OS
 .DS_Store
 Thumbs.db
