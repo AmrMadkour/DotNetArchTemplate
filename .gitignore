@@ -24,6 +24,7 @@ logs/
 ## Node (Presentation/WebApp)
 node_modules/
 dist/
+.env
 
 ## OS
 .DS_Store

@@ -110,8 +110,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapOrderEndpoints();
-app.MapDiagnosticsEndpoints();
 app.MapAuthEndpoints();
+app.MapLoadLogsForTestEndpoint();
 
 app.Run();
 

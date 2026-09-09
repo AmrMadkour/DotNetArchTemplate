@@ -27,9 +27,10 @@ Quick access points — what to look at and where, updated as new patterns land.
 | Centralized message strings, one class per layer (not a shared project) | `Domain/Constants/ValidationMessages.cs`, `Application/Constants/ValidationMessages.cs` |
 | Global exception handler (RFC 7807 `ProblemDetails`, catch-all for unexpected errors) | `Presentation/API/Middleware/GlobalExceptionHandler.cs`, `Presentation/MinimalAPI/Middleware/GlobalExceptionHandler.cs` |
 | Trace ID vs. correlation ID, propagated via `ILogger.BeginScope` (two structured-logging libraries compared side by side) | `Presentation/API/Middleware/RequestLoggingMiddleware.cs` (Serilog), `Presentation/MinimalAPI/Middleware/RequestLoggingMiddleware.cs` (NLog) |
+| Distributed trace continuation across two "services" over HTTP (forwarded `TraceId`/`CorrelationId` headers continue the trace instead of each service minting its own) | `Presentation/API/Controllers/OrdersController.cs`, both `RequestLoggingMiddleware.cs`, `Presentation/MinimalAPI/Endpoints/LoadLogsForTestEndpoint.cs` |
 | JWT bearer authentication (`/auth/token`, `[Authorize]`/`.RequireAuthorization()`) | `Presentation/API/Auth/`, `Presentation/API/Controllers/AuthController.cs`, `Presentation/MinimalAPI/Endpoints/AuthEndpoints.cs` |
 | Fixed-window rate limiting, keyed by user vs. IP (partition-key logic pulled out for testability) | `Presentation/API/RateLimiting/RateLimitPartitionKeyResolver.cs`, `Presentation/MinimalAPI/RateLimiting/RateLimitPartitionKeyResolver.cs` |
-| A real frontend consumer (login → JWT → protected call, client-side token expiry) | `Presentation/WebApp/src/App.jsx` |
+| A real frontend consumer (login → JWT → protected call, client-side token expiry) | `Presentation/WebApp/src/LoginForm.jsx`, `Presentation/WebApp/src/QuoteForm.jsx` |
 
 ## Architecture
 
@@ -44,7 +45,7 @@ Tests  →  Domain, Application, Infrastructure
 - **`Domain/`** — `Order`, `Item`, `Quote`. No dependencies on any other project or framework. `Order`/`Item` now own their invariant checks (`string? Validate()`) and calculations (`CalculateSubtotal()`) as entity behavior, not plain property bags. `Constants/ValidationMessages` centralizes its error message strings.
 - **`Application/`** — use-case orchestration, split by kind: `Services/` (`IQuoteService`/`QuoteService`), `Results/` (`Result<TValue>` — single-generic outcome wrapper with a `string ErrorMessage` for expected failures), `Constants/ValidationMessages` (its own centralized message strings). References `Domain` only; framework-agnostic.
 - **`Infrastructure/`** — scaffolded, currently empty. Intended home for EF Core, repositories, and external clients.
-- **`Presentation/API/`** and **`Presentation/MinimalAPI/`** — two parallel presentation layers (controller-based vs. Minimal API) solving the same use case side by side, each with its own `Dtos/` and `Mapper/` (`OrderMapper`, `ItemMapper`, `QuoteMapper`) for DTO ↔ domain translation. `API` exposes it via `OrdersController`; `MinimalAPI` exposes it via `Endpoints/OrderEndpoints.cs` (`POST /orders/quote`). Each also has its own `Middleware/GlobalExceptionHandler.cs` — a global handler (per Rule 8) that logs unexpected exceptions and returns a generic RFC 7807 `ProblemDetails` response. Both now also have: request logging with a trace ID + correlation ID (Serilog in `API`, NLog in `MinimalAPI`); JWT bearer auth (`/auth/token`, fixed demo credentials, protects the quote endpoint); and fixed-window rate limiting (3 requests/30s, by user on protected endpoints, by IP on the token endpoint). `API` also allows CORS from the React dev server.
+- **`Presentation/API/`** and **`Presentation/MinimalAPI/`** — two parallel presentation layers (controller-based vs. Minimal API) solving the same use case side by side, each with its own `Dtos/` and `Mapper/` (`OrderMapper`, `ItemMapper`, `QuoteMapper`) for DTO ↔ domain translation. `API` exposes it via `OrdersController`; `MinimalAPI` exposes it via `Endpoints/OrderEndpoints.cs` (`POST /orders/quote`). Each also has its own `Middleware/GlobalExceptionHandler.cs` — a global handler (per Rule 8) that logs unexpected exceptions and returns a generic RFC 7807 `ProblemDetails` response. Both now also have: request logging with a trace ID + correlation ID (Serilog in `API`, NLog in `MinimalAPI`) that continues an inbound trace from forwarded headers instead of always minting a fresh one — demonstrated by `OrdersController` calling `MinimalAPI`'s `/diagnostics/load-logs-for-test` endpoint after preparing a quote, treating the two presentation projects as if they were separate services; JWT bearer auth (`/auth/token`, fixed demo credentials, protects the quote endpoint); and fixed-window rate limiting (3 requests/30s, by user on protected endpoints, by IP on the token endpoint). `API` also allows CORS from the React dev server.
 - **`Presentation/WebApp/`** — a plain React + Vite client (not part of the .NET solution) with one form: log in (JWT), then request a quote. Manually verified in a browser, no automated tests.
 - **`Tests/`** — one xUnit project, organized into per-layer folders, with fluent Test Data Builders under `Builders/`.
 
@@ -104,7 +105,7 @@ Portable conventions settled on in this repo — meant to carry over to other pr
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js](https://nodejs.org/) — only needed for `Presentation/WebApp` (the React client)
 
-No database is required — `Infrastructure` is currently an empty scaffold. JWT/rate-limiting config lives in `appsettings.json` with demo defaults, so no environment variables need to be configured to run this locally.
+No database is required — `Infrastructure` is currently an empty scaffold. JWT/rate-limiting config for both .NET projects lives in `appsettings.json` with demo defaults, so neither needs environment variables. `Presentation/WebApp` does need one — see Getting started below.
 
 ## Getting started
 
@@ -133,8 +134,11 @@ In Development, both apps expose the same OpenAPI doc through three UIs side by 
 
 Both require a JWT for the quote endpoint: `POST /auth/token` (`{"username":"demo","password":"demo123"}` by default, see `appsettings.json`) returns a token to send as `Authorization: Bearer <token>`.
 
+`API`'s quote endpoint also calls out to `MinimalAPI` (`Services:MinimalApiBaseUrl` in `Presentation/API/appsettings.json`, default `http://localhost:5110`) to demonstrate cross-service trace correlation — run both for the quote endpoint to work.
+
 ```bash
 cd Presentation/WebApp
+cp .env.example .env   # sets VITE_API_BASE_URL — defaults to http://localhost:5023, matching Presentation/API
 npm install
 npm run dev   # http://localhost:5173 — requires Presentation/API running on http://localhost:5023
 ```
@@ -150,4 +154,4 @@ dotnet test Tests/Tests.csproj --filter "FullyQualifiedName~QuoteServiceTests"  
 
 `Application/QuoteService.PrepareQuote` is implemented: it validates the order via `Order.Validate()`, computes `Subtotal` via `Order.CalculateSubtotal()`, applies `SAVE10`/`SAVE20` coupon rules with dollar thresholds, and computes `Total` — returning `Result<Quote>` throughout instead of throwing, fully covered by `Tests/ApplicationTests/Services/QuoteServiceTests.cs`. DTO ↔ domain mapping exists for `Presentation/API` (`API.Mapper`, covered by `Tests/APITests/Mapper`) and `OrdersController` uses it correctly, covered by `Tests/APITests/Controllers/OrdersControllerTests.cs` (via `Moq`). `Presentation/MinimalAPI` now has its own `Mapper/` and a `POST /orders/quote` endpoint (`Endpoints/OrderEndpoints.cs`), not yet covered by tests. Both presentation projects now have a `GlobalExceptionHandler` wired into `Program.cs`, each fully covered by its own `GlobalExceptionHandlerTests`.
 
-Both presentation projects also now have: request logging with a trace ID + correlation ID (`RequestLoggingMiddleware`, unit tested; the `ILogTestService`/`Diagnostics` endpoint that exercises it is a manual-verification tool, not unit tested); JWT bearer auth (`JwtTokenGenerator` + `AuthController`/`AuthEndpoints`, unit tested; fixed demo credentials, no real user store); and fixed-window rate limiting (`RateLimitPartitionKeyResolver`, unit tested; the actual throttling behavior itself is framework code and isn't). `Presentation/WebApp` is a new React client with a login-then-quote flow against `API`, verified manually in a browser — no automated tests.
+Both presentation projects also now have: request logging with a trace ID + correlation ID (`RequestLoggingMiddleware`, unit tested) that continues an inbound trace from forwarded `X-Trace-Id`/`X-Correlation-Id` headers instead of always minting a fresh one; `OrdersController` calls `MinimalAPI`'s `/diagnostics/load-logs-for-test` endpoint (a manual-verification tool, not unit tested) after preparing a quote to demonstrate this across the two presentation projects. JWT bearer auth (`JwtTokenGenerator` + `AuthController`/`AuthEndpoints`, unit tested; fixed demo credentials, no real user store); and fixed-window rate limiting (`RateLimitPartitionKeyResolver`, unit tested; the actual throttling behavior itself is framework code and isn't). `Presentation/WebApp` is a React client with a login-then-quote flow against `API`, verified manually in a browser — no automated tests.

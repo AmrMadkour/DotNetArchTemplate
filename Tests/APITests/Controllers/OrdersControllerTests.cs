@@ -1,3 +1,4 @@
+using System.Net;
 using API.Controllers;
 using API.Dtos;
 using Application.Results;
@@ -13,6 +14,23 @@ namespace Tests.APITests.Controllers;
 
 public class OrdersControllerTests
 {
+    // Stands in for the real MinimalAPI call OrdersController makes after a successful quote —
+    // always returns 200 without hitting the network, so the test stays isolated.
+    private class FakeHttpMessageHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+    }
+
+    private static Mock<IHttpClientFactory> CreateHttpClientFactoryMock()
+    {
+        var httpClientFactoryMock = new Mock<IHttpClientFactory>();
+        httpClientFactoryMock
+            .Setup(f => f.CreateClient("MinimalApi"))
+            .Returns(new HttpClient(new FakeHttpMessageHandler()) { BaseAddress = new Uri("http://localhost") });
+        return httpClientFactoryMock;
+    }
+
     [Fact]
     public async Task Quote_WhenPrepareQuoteSucceeds_ShouldReturnOk()
     {
@@ -21,7 +39,10 @@ public class OrdersControllerTests
 
         var quoteServiceMock = new Mock<IQuoteService>();
         quoteServiceMock.Setup(q => q.PrepareQuote(It.IsAny<Order>())).ReturnsAsync(Result<Quote>.Success(new QuoteBuilder().Build()));
-        var ordersController = new OrdersController(quoteServiceMock.Object);
+        var ordersController = new OrdersController(quoteServiceMock.Object, CreateHttpClientFactoryMock().Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
 
         //Act
         var response = await ordersController.Quote(new OrderDtoBuilder().Build());
@@ -45,7 +66,7 @@ public class OrdersControllerTests
 
         var quoteServiceMock = new Mock<IQuoteService>();
         quoteServiceMock.Setup(q => q.PrepareQuote(It.IsAny<Order>())).ReturnsAsync(Result<Quote>.Failure(expectedError));
-        var ordersController = new OrdersController(quoteServiceMock.Object);
+        var ordersController = new OrdersController(quoteServiceMock.Object, CreateHttpClientFactoryMock().Object);
 
         //Act
         var response = await ordersController.Quote(new OrderDtoBuilder().Build());

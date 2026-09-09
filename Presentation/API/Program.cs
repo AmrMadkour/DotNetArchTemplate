@@ -16,9 +16,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configured in code rather than appsettings for simplicity — Console for local viewing,
 // rolling daily file under logs/ for anything you want to grep back through later.
+// {Properties} renders BeginScope's TraceId/CorrelationId (and anything else pushed into scope) —
+// without it Serilog's default template drops them entirely, unlike NLog's ${all-event-properties} in MinimalAPI's nlog.config.
+const string outputTemplate = "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj} {Properties}{NewLine}{Exception}";
 builder.Host.UseSerilog((_, configuration) => configuration
-    .WriteTo.Console()
-    .WriteTo.File("logs/api-.log", rollingInterval: RollingInterval.Day));
+    .WriteTo.Console(outputTemplate: outputTemplate)
+    .WriteTo.File("logs/api-.log", rollingInterval: RollingInterval.Day, outputTemplate: outputTemplate));
 
 // Add services to the container.
 
@@ -41,6 +44,11 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddSingleton<IJwtTokenGenerator, JwtTokenGenerator>();
+
+// Points at MinimalAPI, treated here as if it were a separate service — used only by
+// OrdersController's manual-verification call to MinimalAPI's LoadLogsForTest endpoint.
+builder.Services.AddHttpClient("MinimalApi", client =>
+    client.BaseAddress = new Uri(builder.Configuration["Services:MinimalApiBaseUrl"]!));
 
 // Validates JWTs issued by this same app's own /api/Auth/token endpoint — same signing key, no external identity provider.
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -119,7 +127,12 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseHttpsRedirection();
+// Skipped in Development: the React dev server and Swagger both target plain http here,
+// and redirecting the CORS preflight OPTIONS request to https breaks it (browsers won't follow a redirect on preflight).
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors(ReactDevCorsPolicy);
 

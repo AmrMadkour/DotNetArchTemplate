@@ -7,8 +7,15 @@ public class RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggi
 {
     public async Task InvokeAsync(HttpContext context)
     {
-        var traceId = context.TraceIdentifier;
-        var correlationId = Guid.NewGuid().ToString();
+        // Continue an inbound trace when another service forwarded one (e.g. via API's OrdersController
+        // calling this project) instead of always minting a fresh pair, so every log line this request
+        // produces — not just one — ties back to the request that triggered it.
+        var traceId = context.Request.Headers.TryGetValue("X-Trace-Id", out var forwardedTraceId) && !string.IsNullOrEmpty(forwardedTraceId)
+            ? forwardedTraceId.ToString()
+            : context.TraceIdentifier;
+        var correlationId = context.Request.Headers.TryGetValue("X-Correlation-Id", out var forwardedCorrelationId) && !string.IsNullOrEmpty(forwardedCorrelationId)
+            ? forwardedCorrelationId.ToString()
+            : Guid.NewGuid().ToString();
 
         // BeginScope attaches these values to every log line written while the scope is open —
         // including ones written from Application/Infrastructure via their own injected ILogger<T> —
@@ -19,11 +26,11 @@ public class RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggi
             ["CorrelationId"] = correlationId
         }))
         {
-            logger.LogInformation("Request started {Method} {Path}", context.Request.Method, context.Request.Path);
+            logger.LogInformation("MinimalAPI request started {Method} {Path}", context.Request.Method, context.Request.Path);
 
             await next(context);
 
-            logger.LogInformation("Request finished {Method} {Path} with status {StatusCode}", context.Request.Method, context.Request.Path, context.Response.StatusCode);
+            logger.LogInformation("MinimalAPI request finished {Method} {Path} with status {StatusCode}", context.Request.Method, context.Request.Path, context.Response.StatusCode);
         }
     }
 }

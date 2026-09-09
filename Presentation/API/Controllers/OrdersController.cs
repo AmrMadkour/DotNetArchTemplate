@@ -11,7 +11,8 @@ namespace API.Controllers;
 [ApiController]
 [Route("api/[controller]/[action]")]
 public class OrdersController(
-    IQuoteService quoteService) : ControllerBase
+    IQuoteService quoteService,
+    IHttpClientFactory httpClientFactory) : ControllerBase
 {
     [Authorize]
     [EnableRateLimiting("PerUser")]
@@ -20,8 +21,25 @@ public class OrdersController(
     {
         var order = orderDto.ToDomain();
         var result = await quoteService.PrepareQuote(order);
-        return result.IsSuccess
-            ? Ok(result.Value.ToDto())
-            : BadRequest(result.ErrorMessage);
+        if (!result.IsSuccess)
+        {
+            return BadRequest(result.ErrorMessage);
+        }
+
+        await CallMinimalApiLoadLogsForTest();
+
+        return Ok(result.Value.ToDto());
+    }
+
+    // Manual-verification call, treating MinimalAPI as if it were a separate service: forwards this
+    // request's TraceId/CorrelationId so its log line can be tied back to this one.
+    private async Task CallMinimalApiLoadLogsForTest()
+    {
+        var client = httpClientFactory.CreateClient("MinimalApi");
+        var request = new HttpRequestMessage(HttpMethod.Get, "/diagnostics/load-logs-for-test");
+        request.Headers.Add("X-Trace-Id", HttpContext.TraceIdentifier);
+        request.Headers.Add("X-Correlation-Id", HttpContext.Items["CorrelationId"]?.ToString());
+
+        await client.SendAsync(request);
     }
 }
