@@ -7,6 +7,8 @@ using Domain.Models;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using Moq;
 using Tests.Builders;
 
@@ -39,7 +41,11 @@ public class OrdersControllerTests
 
         var quoteServiceMock = new Mock<IQuoteService>();
         quoteServiceMock.Setup(q => q.PrepareQuote(It.IsAny<Order>())).ReturnsAsync(Result<Quote>.Success(new QuoteBuilder().Build()));
-        var ordersController = new OrdersController(quoteServiceMock.Object, CreateHttpClientFactoryMock().Object)
+        var ordersController = new OrdersController(
+            quoteServiceMock.Object,
+            CreateHttpClientFactoryMock().Object,
+            TimeProvider.System,
+            new Mock<ILogger<OrdersController>>().Object)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
@@ -66,7 +72,11 @@ public class OrdersControllerTests
 
         var quoteServiceMock = new Mock<IQuoteService>();
         quoteServiceMock.Setup(q => q.PrepareQuote(It.IsAny<Order>())).ReturnsAsync(Result<Quote>.Failure(expectedError));
-        var ordersController = new OrdersController(quoteServiceMock.Object, CreateHttpClientFactoryMock().Object);
+        var ordersController = new OrdersController(
+            quoteServiceMock.Object,
+            CreateHttpClientFactoryMock().Object,
+            TimeProvider.System,
+            new Mock<ILogger<OrdersController>>().Object);
 
         //Act
         var response = await ordersController.Quote(new OrderDtoBuilder().Build());
@@ -80,5 +90,42 @@ public class OrdersControllerTests
         //var badRequestResultFa = response.Result.Should().BeOfType<BadRequestObjectResult>().Which;
         //badRequestResultFa.StatusCode.Should().Be(StatusCodes.Status400BadRequest);
         //badRequestResultFa.Value.Should().BeOfType<string>().And.BeEquivalentTo(expectedError);
+    }
+
+    // Proves the point of injecting TimeProvider: a FakeTimeProvider set to a known instant drives
+    // what DemoTimeProviderVsDateTimeNow logs — something DateTime.UtcNow could never be made to do
+    // deterministically in a test.
+    [Fact]
+    public async Task Quote_WhenPrepareQuoteSucceeds_ShouldLogInjectedTimeProviderNow()
+    {
+        //Arrange
+        var quoteServiceMock = new Mock<IQuoteService>();
+        quoteServiceMock.Setup(q => q.PrepareQuote(It.IsAny<Order>())).ReturnsAsync(Result<Quote>.Success(new QuoteBuilder().Build()));
+        var fixedNow = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+        var fakeTimeProvider = new FakeTimeProvider(fixedNow);
+        var loggerMock = new Mock<ILogger<OrdersController>>();
+        var ordersController = new OrdersController(
+            quoteServiceMock.Object,
+            CreateHttpClientFactoryMock().Object,
+            fakeTimeProvider,
+            loggerMock.Object)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+        //Act
+        await ordersController.Quote(new OrderDtoBuilder().Build());
+
+        //Assert — checks the structured "ProviderNow" value directly, rather than the formatted message
+        //string, so the assertion doesn't depend on the logger's culture-dependent ToString() format.
+        loggerMock.Verify(
+            l => l.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) => ((IReadOnlyList<KeyValuePair<string, object>>)state)
+                    .Any(kv => kv.Key == "ProviderNow" && kv.Value.Equals(fixedNow))),
+                null,
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 }

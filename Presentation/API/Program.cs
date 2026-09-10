@@ -33,6 +33,11 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices();
 
+// Registered as an injectable abstraction over "now" (rather than calling DateTime.Now/UtcNow
+// directly) so tests can swap in a FakeTimeProvider instead of being stuck with the real clock.
+// See OrdersController.DemoTimeProviderVsDateTimeNow for the comparison.
+builder.Services.AddSingleton(TimeProvider.System);
+
 // Allows the Presentation/WebApp React dev server (a different origin) to call this API.
 const string ReactDevCorsPolicy = "ReactDev";
 builder.Services.AddCors(options =>

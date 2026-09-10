@@ -12,7 +12,9 @@ namespace API.Controllers;
 [Route("api/[controller]/[action]")]
 public class OrdersController(
     IQuoteService quoteService,
-    IHttpClientFactory httpClientFactory) : ControllerBase
+    IHttpClientFactory httpClientFactory,
+    TimeProvider timeProvider,
+    ILogger<OrdersController> logger) : ControllerBase
 {
     [Authorize]
     [EnableRateLimiting("PerUser")]
@@ -27,6 +29,7 @@ public class OrdersController(
         }
 
         await CallMinimalApiLoadLogsForTest();
+        DemoTimeProviderVsDateTimeNow();
 
         return Ok(result.Value.ToDto());
     }
@@ -41,5 +44,22 @@ public class OrdersController(
         request.Headers.Add("X-Correlation-Id", HttpContext.Items["CorrelationId"]?.ToString());
 
         await client.SendAsync(request);
+    }
+
+    // Manual-verification demo: DateTime.UtcNow reads the real system clock directly, so any logic
+    // branching on "now" (expiry checks, scheduling, audit timestamps) can't be controlled from a test —
+    // there's no way to make DateTime.UtcNow return a specific instant without sleeping the test thread
+    // or wrapping it yourself. TimeProvider is injected instead (registered as TimeProvider.System in
+    // Program.cs), so a unit test can substitute Microsoft.Extensions.TimeProvider.Testing's
+    // FakeTimeProvider and set "now" to whatever instant the test needs, exercising the same production
+    // code path deterministically.
+    private void DemoTimeProviderVsDateTimeNow()
+    {
+        var systemNow = DateTime.UtcNow;
+        var providerNow = timeProvider.GetUtcNow();
+
+        logger.LogInformation(
+            "TimeProvider demo — DateTime.UtcNow: {SystemNow}, TimeProvider.GetUtcNow(): {ProviderNow}",
+            systemNow, providerNow);
     }
 }
